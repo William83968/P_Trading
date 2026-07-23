@@ -16,6 +16,10 @@ build/
 dist/
 *.egg-info/
 
+# Generated simulation diagnostics
+output/
+saves/
+
 # Local environments
 .venv/
 venv/
@@ -29,3 +33,6 @@ env/
 
 # Operating-system metadata
 .DS_Store
+
+# Game assets
+assets/

@@ -1,0 +1,16 @@
+routes:
+  - id: crowns_haven_san_cordelia
+    port_a: crowns_haven
+    port_b: san_cordelia
+    travel_ticks: 36
+    operating_cost: 150
+  - id: san_cordelia_blackwater_cay
+    port_a: san_cordelia
+    port_b: blackwater_cay
+    travel_ticks: 24
+    operating_cost: 100
+  - id: blackwater_cay_crowns_haven
+    port_a: blackwater_cay
+    port_b: crowns_haven
+    travel_ticks: 30
+    operating_cost: 125

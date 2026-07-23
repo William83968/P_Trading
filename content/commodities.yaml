@@ -1,0 +1,36 @@
+commodities:
+  - id: grain
+    name: Grain
+    base_price: 100
+    minimum_price: 50
+    maximum_price: 250
+    elasticity_bp: 7500
+    spread_bp: 500
+  - id: timber
+    name: Timber
+    base_price: 250
+    minimum_price: 125
+    maximum_price: 625
+    elasticity_bp: 7500
+    spread_bp: 500
+  - id: sugar
+    name: Sugar
+    base_price: 400
+    minimum_price: 200
+    maximum_price: 1000
+    elasticity_bp: 7500
+    spread_bp: 500
+  - id: rum
+    name: Rum
+    base_price: 650
+    minimum_price: 325
+    maximum_price: 1625
+    elasticity_bp: 7500
+    spread_bp: 500
+  - id: cloth
+    name: Cloth
+    base_price: 900
+    minimum_price: 450
+    maximum_price: 2250
+    elasticity_bp: 7500
+    spread_bp: 500

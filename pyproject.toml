@@ -21,6 +21,7 @@ dev = [
 
 [project.scripts]
 pirate-trading = "pirate_trading.__main__:main"
+pirate-trading-headless = "pirate_trading.headless:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
