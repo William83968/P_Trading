@@ -59,7 +59,26 @@ For example:
 
 Authored templates may frame events and provide character, but they should respond to real world state rather than fabricate unrelated conditions.
 
-### 2.5 Scope is a design constraint
+Price movement is supporting feedback, not the primary attraction. A changing quote is meaningful
+when it is evidence of a storm, robbery, conflict, celebration, discovery, political decision, or
+local story that gives the player something to investigate or act upon. The game must not rely on
+watching inventory curves and repeatedly selecting the largest margin as its central experience.
+
+### 2.5 Events and choices drive play
+
+Milestones 2 through 4 must turn the simulated economy into a world of situations:
+
+- Events change travel, production, demand, safety, access, characters, and local priorities.
+- Stories give each location persistent conflicts, relationships, and consequences.
+- Opportunities let the player trade, help, exploit, investigate, escort, smuggle, fight, or walk
+  away.
+- Markets respond to those situations and help the player understand them, but do not replace them.
+
+Every major event should create or alter at least one player decision beyond simply buying the
+commodity whose price is expected to rise. Every location storyline should offer choices whose
+consequences remain visible after the immediate transaction.
+
+### 2.6 Scope is a design constraint
 
 The game should prefer a small world with clear, interacting systems over a large world filled with shallow content. Every feature must improve at least one of these:
 
@@ -75,7 +94,7 @@ The game should prefer a small world with clear, interacting systems over a larg
 1. Gather information at a port.
 2. Choose cargo, a route, and an acceptable level of risk.
 3. Travel while time and the world advance.
-4. Respond to opportunities, hazards, and other ships.
+4. Respond to world events, local story opportunities, hazards, and other ships.
 5. Sell, repair, resupply, and improve the ship or crew.
 6. Build wealth, knowledge, relationships, and reputation.
 
@@ -87,6 +106,7 @@ The game should prefer a small world with clear, interacting systems over a larg
 - Immediate profit versus faction reputation
 - Fighting, fleeing, negotiating, or surrendering cargo
 - Acting on incomplete or outdated information
+- Helping, exploiting, or opposing local interests and living with the consequences
 
 ### Initial MVP boundaries
 
@@ -215,6 +235,11 @@ Events affect production, consumption, cargo, travel time, route availability, d
 costs, or risk. Prices continue to emerge from resulting market state. Material creation,
 destruction, and transfer of goods or cash must be recorded in explicit ledgers.
 
+Local households sit outside the ship-and-port balance sheet. Their purchases of consumed goods
+therefore enter the cash ledger as an explicit `local_consumption_revenue` source. This keeps
+importing ports liquid enough to buy arriving cargo without disguising the source as a treasury
+reset or silently creating cash.
+
 Persistent world conditions should have stable IDs and record:
 
 - Event type, start tick, lifecycle stage, and expected or actual expiry
@@ -234,6 +259,74 @@ trading instructions. Exact severity, duration, inventories in transit, competin
 intentions, and some secondary consequences may remain unknown. Reports may be accurate, delayed,
 incomplete, exaggerated, or genuine rumours that later prove false, but uncertainty must come from
 the information model rather than arbitrary reversals of the underlying simulation.
+
+Price movement alone is not an event or a complete gameplay reward. The event system must also
+create decisions about routes, timing, safety, access, obligations, relationships, and competing
+goals. Market history is one way to observe consequences after the world has changed.
+
+### Weekly threat and fortune
+
+Every 168 simulation hours, before that week's commands or world updates, the
+`weekly_outlook` random stream rolls two six-sided dice. The total is global for the week and is
+saved with its two faces, tick range, setting ID, and pending-reveal state. The classic 2d6
+distribution gives totals 2 through 12 respectively `1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1` chances out
+of 36. Common middle weeks provide stability; rare extremes create memorable danger or fortune.
+
+| Roll | Setting | Trade access | Opportunities | Raid risk | Additional rule |
+|---:|---|---:|---:|---:|---|
+| 2 | Black Flags | 75% | 70% | 175% | More false rumours |
+| 3 | Closed Ledgers | 70% | 60% | 110% | Customs and inspection failures |
+| 4 | Lean Harbors | 82% | 75% | 125% | Spreads 20% wider |
+| 5 | Contrary Winds | 90% | 90% | 140% | Voyage progress 90% |
+| 6 | Uneasy Waters | 92% | 85% | 115% | Report delay 125% |
+| 7 | Even Keel | 100% | 100% | 100% | Neutral baseline |
+| 8 | Merchant Winds | 100% | 115% | 90% | Voyage progress 110% |
+| 9 | Open Markets | 100% | 125% | 90% | Spreads reduced to 85% |
+| 10 | Rumour Tide | 95% | 150% | 110% | More rumours; 40% are false |
+| 11 | Golden Routes | 100% | 150% | 75% | Contract rewards 10% higher |
+| 12 | Fortune's Crown | 100% | 200% | 50% | Rare offer and one daily 5% boon |
+
+Trade access is resolved only after an otherwise-valid public-market command. The result is cached
+per actor, port, and day, so failure changes no state and retrying cannot reroll it. Fortune's
+Crown adjusts the first successful daily transaction, with the port transferring the same adjusted
+cash amount so conservation remains exact.
+
+The UI interrupts time with a 1.2-second code-drawn dice tumble and explicit reveal. Animation uses
+frame time rather than a simulation stream. The prior play state resumes only after dismissal. A
+bold `WEEK · SETTING · ROLL` map heading remains visible and opens the complete explanation.
+
+### Event catalogue and milestone ownership
+
+Events use stable condition IDs, explicit scope and severity, lifecycle ticks, mechanical effects,
+reports, responses, aftermath, and cooldown. Prices are never directly rolled.
+
+| Family | State effects and lifecycle | Player responses and aftermath | Target |
+|---|---|---|---|
+| Tropical storm | 1–2-day warning; 1–3 active days; route progress 60–80% and greater danger | Delay, reroute, risk sailing, or exploit delayed traffic; travel recovers afterward | M2 |
+| Hurricane | 2–3-day warning; 1–2 active days; 7–14 recovery days; production and travel halved; exposed stock loss | Evacuate, deliver relief, repair, or speculate with uncertain severity | M2 |
+| Bumper harvest | 5–10 days of 50–100% additional relevant production | Carry surplus or wait; stock and price normalize after expiry | M2 |
+| Crop blight | 7–14 days of 50–80% lower grain, sugar, or coffee production | Fund treatment, deliver substitutes, or trade the shortage | M2 |
+| Festival | Announced 2–4 days ahead; 2–4 days of 25–75% greater selected consumption | Supply celebrations or avoid the crowd; unmet demand may trigger relief | M2 |
+| Warehouse fire | Immediate 10–30% declared stock sink and temporary storage pressure | Deliver replacements or exploit another port; every loss is ledgered | M2 |
+| Shipyard commission | 7–14 days of timber and cloth demand plus a delivery contract | Commit hold space before its deadline or decline | M2 |
+| Relief call | Triggered by sustained unmet demand and requests grain or medicine | Deliver aid or decline; completion and expiry remain in the Journal | M2 |
+| Robbery / pirate raid | Route-risk encounter based on cargo, weather, ship state, and weekly threat | Flee, pay, surrender, or bluff; bounded losses enter the piracy ledger | M2; persistent pirates M3 |
+| Treasure discovery | Clue, search window, discovery, ownership dispute, and sale or recovery | Investigate, sell information, claim, conceal, or abandon | M3 |
+| Naval or pirate battle | Warning, pursuit, engagement, loss, wreckage, and traffic recovery | Avoid, assist, prey on survivors, or fight; all resources belong to actors | M3 |
+| New law or customs order | Announced policy affects tariffs, access, legality, or inspections until repeal | Comply, reroute, lobby, or smuggle | M4 |
+| Faction conflict | Escalation, hostility, blockade or patrol changes, settlement, and consequences | Choose sides, contract, remain neutral, privateer, or exploit illicit access | M4 |
+
+Milestone 2 implements the first eight causal conditions and non-combat piracy. Rumours report
+possible facts but never mutate the world. Milestone 3 gives robbery, battle, and treasure
+persistent actors. Milestone 4 adds law, factions, and longer authored arcs.
+
+The Milestone 2 player ship is itself a pirate vessel. It may raid an AI ship sharing its route or
+raid the port where it is docked. Ship raids pay a preparation cost and risk condition damage.
+Port raids cost more, impose condition damage, close that day's public market, increase persistent
+local hostility, and create a seven-day alert cooldown. Successful raids transfer existing cargo
+or cash from the victim; preparation expenses are explicit ledger sinks. This is a lightweight
+piracy layer, not a substitute for Milestone 3 pursuit, combat, reputation, navy response, or
+persistent pirate actors.
 
 Location stories use an authored narrative spine with simulation-generated connective events.
 Every port should have recurring characters or factions, an ongoing local conflict, distinct
@@ -318,7 +411,7 @@ Save/load round trips must preserve state exactly. Migrations are required when 
 
 The interface should make the simulation understandable rather than merely decorative. The player must be able to see current conditions, compare opportunities, understand recent changes, and issue commands without interpreting raw simulation state.
 
-The first UI targets a 1280×720 window:
+The first UI targeted a 1280×720 window:
 
 - A 1000×706 map area using the Atlantic map
 - A right sidebar for time, cash, cargo, market information, and actions
@@ -326,6 +419,9 @@ The first UI targets a 1280×720 window:
 - Fixed-size overlays for news, explanations, contracts, and confirmations
 
 The layout may become responsive later, but Milestone 1 should first establish a clear, readable fixed-resolution interface.
+
+Milestone 2.2 raised the current default to 1440×810. The smaller resolution remains useful as a
+historical Milestone 1 constraint, not the target for the expanding living-world interface.
 
 ### Pygame template
 
@@ -362,6 +458,7 @@ Rendering frame rate and simulation time are independent. The UI may render at 6
 - `stamp.png`: navy marker
 - `pirate-hat.png`: pirate threat or pirate faction marker
 - `diploma.png`: contracts and official notices
+- `explode.png`: scale, rotation, and fade burst when the player is attacked or completes a raid
 - `anchor.png`: current port and docking
 - `dollar.png`: player cash
 - `health.png`: ship condition
@@ -371,7 +468,8 @@ Rendering frame rate and simulation time are independent. The UI may render at 6
 - `information.png`: help, explanations, and tooltips
 - `play.png` and `pause.png`: time controls
 - `left-arrow.png` and `right-arrow.png`: navigation and paging
-- `The Sailor's Tale.mp3`: background music
+- `The Sailor's Tale.mp3`: retained but unassigned; it is not suitable as the game's background
+  music and must not play by default
 
 `stamp.png` is intentionally a 32×32 map marker and should remain near its native size. `navy.png` currently has no assigned UI role and should not be used in place of the stamp. The paper texture should remain a fixed overlay rather than being stretched as a general-purpose panel.
 
@@ -453,6 +551,29 @@ Facts, estimates, rumours, and stale information require visible text labels or 
 never be distinguished by colour alone. The same selected port and commodity should carry across
 the Market, Hold, history, news, and opportunity views to reduce navigation work.
 
+### Milestone 2 information presentation
+
+- The weekly outlook is the strongest persistent signal: a bold map-top heading is always visible,
+  while its animated reveal and explanation overlay reserve interruption for the weekly boundary.
+- Local market rows are live facts. Remote rows show only the newest report the player has received,
+  with source, confidence, and age; unavailable data uses an explicit dash rather than hidden live
+  state.
+- Active storms and hurricanes color affected routes and ports, while detailed duration and
+  severity remain in News. Map color is always paired with a heading or text label.
+- Market shows today's weekly clearance probability and unknown, passed, or blocked state.
+- Port combines route duration, operating cost, base threat, provisions, condition, wage debt,
+  repairs, and upgrades so voyage readiness is assessed in one place.
+- Opportunities contains actionable story choices and delivery contracts. Journal contains
+  resolved local decisions and their lasting consequences. Neither is mixed into routine market
+  news.
+- Pirate encounters are focused modal decisions because they stop the voyage. Ordinary report
+  arrivals, market changes, AI activity, and condition transitions remain non-modal.
+- Major reports are an exception to routine non-modal news: hurricanes, storms, blights, warehouse
+  fires, shipyard commissions, and relief calls open a short pausing notice. The notice summarizes
+  the situation and links the player toward News rather than exposing hidden severity.
+- Accepted delivery contracts remain pinned ahead of new offers. Their lifecycle is
+  **Offered → Accepted → Delivered/Abandoned/Expired**, and accepting never consumes cargo.
+
 ### Market venues and local identity
 
 Ports may contain several economically distinct venues without duplicating the entire interface:
@@ -476,12 +597,16 @@ The initial ports establish the following narrative and economic identities:
   and export disputes.
 - **Blackwater Cay:** rum, smugglers, treasure hunters, pirate brokers, stolen cargo, and unreliable
   information.
+- **Whitecap Reach:** salt pans, repair yards, storm defenses, practical sailors, and concessions.
+- **Isla Esmeralda:** coffee, medicine, crop research, relief work, and fragile plantation finance.
 
 ### Asset licensing and acknowledgements
 
 `assets/acknowledgements.html` records the supplied Flaticon attributions and should be included in release packages and exposed from the credits screen. Before release, each acknowledgement should identify the corresponding asset filename, and the provenance or license for the map, paper, soundtrack, ship artwork, and fonts should also be recorded.
 
-The soundtrack uses the MP3 version only. The removed WAV contained the same soundtrack and is not needed.
+The supplied MP3 is retained for provenance but currently has no approved in-game role. The
+removed WAV contained the same soundtrack and is not needed. A future soundtrack requires a new
+audio-direction decision rather than automatically reusing this file.
 
 ## 7. Recommended Starter Scaffold
 
@@ -501,6 +626,8 @@ PirateTrading/
 │       ├── simulation.py
 │       ├── diagnostics.py
 │       ├── persistence.py
+│       ├── world_events.py
+│       ├── narrative.py
 │       ├── headless.py
 │       └── ui.py
 ├── assets/
@@ -514,14 +641,15 @@ PirateTrading/
 │   ├── test_simulation.py
 │   ├── test_determinism.py
 │   ├── test_persistence.py
-│   └── test_ui.py
+│   ├── test_ui.py
+│   └── test_milestone2.py
 ├── saves/
 │   └── quicksave.json
 └── output/
     └── milestone_0_events.jsonl
 ```
 
-This scaffold contains only what the headless economic experiment needs. Generated output is ignored by Git.
+This remains a deliberately flat scaffold. Generated output is ignored by Git.
 
 Keep Milestone 0 in these flat modules. Introduce packages such as `presentation`, `persistence`, `navigation`, `encounters`, `factions`, and `narrative` only when their milestones begin. Split existing modules only when their actual size or responsibilities justify it.
 
@@ -562,7 +690,7 @@ Build:
 - Player cash, cargo, immediate dockside trading, and empty repositioning voyages
 - Text-first commodity table with stock status, bid, ask, and daily price trend
 - Pause and 4/8/16-hour time controls with automatic pause on player arrival
-- Market-history charts, recent news, credits, music, and asset caching
+- Market-history charts, recent news, credits, and asset caching
 - Versioned atomic quick-save with New Game, Continue, Save, and Load
 - Separate `pirate-trading` UI and `pirate-trading-headless` console commands
 
@@ -601,24 +729,174 @@ Exit criteria:
 
 ### Milestone 2 — Risk and route decisions
 
+Status: Implemented
+
 Build:
 
 - Expand to the MVP's 5 ports and 8 commodities
+- Global weekly 2d6 threat/fortune setting with animated reveal and persistent heading
 - Supplies, wages, maintenance, and travel costs
 - Persistent causal world-event framework and lifecycle
 - Weather conditions and route modifiers that affect actual traffic and production
+- Port events such as harvest changes, celebrations, accidents, and urgent local needs
 - Incomplete market knowledge, delayed reports, rumours, and information age
 - Basic encounter framework and pirate threat
 - Ship upgrades that create meaningful trade-offs
+- One introductory persistent choice at each port
 
 Exit criteria:
 
 - The nominally most profitable route is not always the best choice after cost and risk.
 - Weather and information age visibly affect player decisions.
+- A normal play session presents world situations requiring route, timing, safety, or commitment
+  decisions beyond comparing price margins.
 - Relevant visible events have useful but bounded predictive value for subsequent market movement.
 - Counterfactual, conservation, replay, and multi-seed stability tests pass.
 - At least three economically viable ship configurations or strategies exist.
 - Automated simulations do not converge to permanent universal shortages or price caps.
+
+### Milestone 2.1 — Situations and consequences
+
+Status: Implemented; manual three-session balance acceptance remains pending
+
+Milestone 2.1 adds a second, faster situation cadence without increasing the major-event rate.
+Every 48–96 hours the narrative system attempts to derive one eligible opportunity from an
+existing warning, active condition, recovery, market need, dangerous route, or piracy state.
+Supported objectives include commercial and relief delivery, weather reconnaissance, evacuation,
+warehouse salvage, route protection, Blackwater smuggling, Festival Supply, and Harvest Export.
+Festival Supply stores a named festive commodity; Harvest Export carries the harvested commodity
+to the directly connected port with the lowest inventory ratio. The generator never invents an
+unsupported cause or offers salvage without a recoverable declared loss. Accepted mission loads
+reserve real hold capacity; travel objectives complete from actual route traversal and arrivals,
+deliveries consume real clean cargo, and salvage can only recover quantities recorded by an
+event-loss ledger.
+
+An opportunity begins Offered, can become Accepted, and ends Delivered/Resolved, Abandoned, or
+Expired. Acceptance is tied to its issuing port and does not move when the player revisits.
+Accepted objectives remain pinned and retain origin, destination, route, capacity, progress,
+deadline, related report, and public effect summary. An opportunity becomes known only when its
+issuing bulletin reaches the player or the player visits that port.
+
+One presentation-level mission progress view supplies both Opportunities and mission notices.
+Accepted missions display an objective-specific live checklist: clean cargo or reserved load,
+origin and destination, exact-route or any-route status, non-mutating voyage percentage, next
+action, deadline, reward, penalty, and explicit disabled-action reason. Delivery briefings
+distinguish required trade goods from supplied mission loads; evacuation and contraband occupy
+real hold capacity. Modal updates occur only at acceptance, completion, and failure. Abandoning an
+accepted mission or allowing its deadline to expire charges 25% of the promised reward, with a
+$10 minimum, limited by the captain's available cash and recorded in the economic ledger.
+
+Accepted missions remain in a scrollable Journal history after resolution. Each entry records the
+objective-specific payload, origin and destination, acceptance and resolution times, outcome, and
+reward or assessed penalty without replacing the existing local-story journal.
+
+Hurricanes, tropical storms, blights, warehouse fires, direct raid threats, urgent contracts, and
+rare opportunities interrupt once when first learned. The notice queue pauses immediately and
+offers links to the target, related opportunity, and News. Ordinary lifecycle updates remain
+grouped in News rather than reopening a modal notice.
+
+News, opportunities, and interrupting notices pause simulation while they are being read. Closing
+News restores the time state that existed before News opened. Acknowledging an interrupting notice
+or mission update deliberately leaves time paused so the player chooses when to continue.
+
+Player piracy now creates reversible strategic pressure:
+
+- Successful/failed ship raids add 6/10 notoriety and 8/12 heat at both route endpoints.
+- Successful/failed port raids add 12/18 notoriety and 25/35 local heat.
+- Heat is clamped to 0–100 and decays by two per day after 72 raid-free hours. Notoriety decays
+  by two after each raid-free week.
+- Clear (0–24), Watched (25–49), Wanted (50–74), and Hunted (75–100) progressively reduce lawful
+  access, raise repair prices, refuse upgrades, and finally block public trading.
+- Crown's Haven, San Cordelia, Whitecap Reach, Isla Esmeralda, and Blackwater Cay use enforcement
+  strengths of 100%, 80%, 70%, 60%, and 0%. Blackwater ignores lawful restrictions.
+
+Every route has authored navy patrol strength. Patrol encounter probability combines that
+strength with endpoint heat, notoriety, stolen cargo value, and enforcement, capped at 75%.
+Non-combat navy encounters offer Pay Fine, Surrender Contraband, Flee, and Bluff. Fines,
+confiscation, damage, and heat changes are deterministic consequences recorded in explicit
+ledgers and encounter history.
+
+Stolen quantities are tracked as a subset of ordinary cargo through partial movement, sale,
+fencing, confiscation, and save/load. Blackwater fences selected stolen cargo at 80% of its
+current bid and offers Lay Low for $100 once per week, reducing notoriety and heat. Lawful ports
+permit a weekly payoff of $5 per removed heat point, up to 20 points, except while Hunted.
+
+Format-2 saves remain compatible. Loading validates the hash of the unmodified saved world first,
+then supplies deterministic defaults for additive Milestone 2.1 fields. Legacy festival private
+deliveries without a commodity receive the locally scarcest festive good without changing an
+accepted destination. Newly written saves retain format 2 and include the expanded canonical state.
+
+Exit criteria:
+
+- Known actionable situations normally arrive within four days and never rely on nonexistent
+  conditions.
+- Major notices interrupt once, preserve context, and do not grow an unbounded queue.
+- Heat and notoriety produce visible but recoverable consequences.
+- Piracy can be profitable without dominating lawful trading after costs, damage, fines, and
+  enforcement.
+- All cargo, cash, loss, recovery, fine, and confiscation paths reconcile in invariants.
+- Legacy format-2 saves load after raw-hash validation and continue deterministically.
+
+### Milestone 2.2 — Scalable UI, camera, and deliberate raiding
+
+Status: Implemented; manual camera-and-raid acceptance remains pending
+
+The map now renders through a camera over stable 1000×706 world coordinates. The initial view
+frames the five-port network at no more than 2× zoom; players can zoom from 1× to 3× around the
+cursor, drag to pan, press `F` to follow the ship, or press `Home` to frame the network. Routes,
+ports, ships, patrol stamps, labels, weather, explosions, and hit tests share the same transform.
+
+The presentation is exposed through a small `pirate_trading.ui` package while retaining the
+existing `run_ui` interface. Application lifecycle, camera transforms, responsive region layout,
+panel calculations, and overlay calculations have separate responsibilities. The shell defines a
+status bar, navigation rail, camera workspace, collapsible inspector, and action tray. Market,
+Hold, Port, Ship, and Heat remain contextual; News, Opportunities, Journal, and History use global
+navigation.
+
+The default window is 1440×810. `message_paper.png` is cached at a larger, wider overlay size so
+notices and decisions have a useful reading area. Opportunities maintain independent scroll state
+for the offer list and the selected offer's full description and objective details.
+
+Relief calls are demand-triggered rather than part of the random major-event catalogue. They
+require three consecutive unmet-demand days, are limited to one active call globally, and use a
+21-day cooldown for each port/commodity pair. A relief call owns its delivery contract, so the
+general situation scheduler does not create a duplicate delivery from the same condition.
+
+Player raids use a two-stage transaction. The initial command resolves cost, success, base damage,
+heat, notoriety, and cooldown. Success creates a persistent loot manifest from the victim's actual
+cargo or port stock. Claiming is an atomic command:
+
+- Ship raids cost $5 and permit up to 8 selected units.
+- Port raids cost $25 and permit up to 15 selected units.
+- Hostile pirate losses against the player are capped at 5 units.
+- Ship success damage is 2 plus one per four claimed units, rounded upward.
+- Port success damage is 3 plus one per three claimed units, rounded upward.
+- Reinforced Hull reduces total raid damage by 30%, rounded upward.
+- Failed ship and port raids cause 8 and 11 damage and create no manifest.
+- Player raids transfer commodities only; automatic cash and highest-value cargo selection are
+  removed.
+
+Stolen quantities remain a strict subset of ordinary cargo. Hold displays clean and stolen units
+separately. Lawful markets can sell only clean units and return an explicit contraband reason
+without partial mutation. Blackwater fences the selected stolen commodity and quantity at 80% of
+its current bid. Local raid alerts are distinguished from weekly market disruptions so a rejected
+sale explains why the cargo remains aboard.
+
+`PendingRaidLoot`, claim and abandon commands, and world state use additive defaults. Format-2
+saves remain compatible, and loading pending loot restores the paused decision overlay.
+
+Exit criteria:
+
+- The camera makes the active network occupy useful screen space and every map interaction remains
+  aligned through zoom and pan.
+- The UI package retains import compatibility and region calculations do not overlap.
+- Player-selected loot comes from real inventories, respects capacity and haul limits, and
+  reconciles through conservation invariants.
+- Aggressive successful raids can take more cargo than hostile encounters can remove.
+- Port raids never automatically create five medicine, and rejected lawful contraband sales state
+  the actual reason.
+- Pending raid decisions survive format-2 saves and all deterministic, headless, and pygame checks
+  pass.
 
 ### Milestone 3 — Naval interaction
 
@@ -631,6 +909,8 @@ Build:
 - Rewards and consequences that feed back into trade routes and markets
 - Robberies, battles, and treasure discoveries operate on persistent actors, cargo, cash, and
   explicit economic ledgers
+- Encounter outcomes create follow-up reports, retaliation, recovery, or opportunities rather than
+  ending as isolated random interruptions
 
 Choose the combat format only after prototyping it. Do not commit prematurely to real-time tactical combat if a faster encounter system better preserves the trading game's pace.
 
@@ -649,6 +929,8 @@ Build:
 - Contracts derived from actual simulation conditions
 - Narrative observer, authored local story spines, and simulation-driven connective events
 - Distinct public, contractual, private, and illicit opportunities at each port
+- Player choices advance, redirect, or close local story branches and remain visible in later world
+  state
 - Multiple long-term progression paths
 
 Exit criteria:

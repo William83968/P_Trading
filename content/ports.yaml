@@ -1,6 +1,7 @@
 ports:
   - id: crowns_haven
     name: Crown's Haven
+    enforcement_bp: 10000
     map_x: 245
     map_y: 375
     inventories:
@@ -9,8 +10,12 @@ ports:
       sugar: {quantity: 60, target: 100, production: 0, consumption: 10}
       rum: {quantity: 60, target: 100, production: 0, consumption: 8}
       cloth: {quantity: 140, target: 100, production: 20, consumption: 5}
+      salt: {quantity: 100, target: 100, production: 5, consumption: 5}
+      coffee: {quantity: 60, target: 100, production: 0, consumption: 8}
+      medicine: {quantity: 80, target: 100, production: 5, consumption: 5}
   - id: san_cordelia
     name: San Cordelia
+    enforcement_bp: 8000
     map_x: 430
     map_y: 620
     inventories:
@@ -19,8 +24,12 @@ ports:
       sugar: {quantity: 140, target: 100, production: 20, consumption: 5}
       rum: {quantity: 60, target: 100, production: 0, consumption: 8}
       cloth: {quantity: 100, target: 100, production: 5, consumption: 5}
+      salt: {quantity: 60, target: 100, production: 0, consumption: 10}
+      coffee: {quantity: 100, target: 100, production: 5, consumption: 5}
+      medicine: {quantity: 60, target: 100, production: 0, consumption: 8}
   - id: blackwater_cay
     name: Blackwater Cay
+    enforcement_bp: 0
     map_x: 260
     map_y: 555
     inventories:
@@ -29,3 +38,34 @@ ports:
       sugar: {quantity: 100, target: 100, production: 5, consumption: 5}
       rum: {quantity: 160, target: 100, production: 25, consumption: 5}
       cloth: {quantity: 60, target: 100, production: 0, consumption: 10}
+      salt: {quantity: 100, target: 100, production: 5, consumption: 5}
+      coffee: {quantity: 60, target: 100, production: 0, consumption: 8}
+      medicine: {quantity: 60, target: 100, production: 0, consumption: 8}
+  - id: whitecap_reach
+    name: Whitecap Reach
+    enforcement_bp: 7000
+    map_x: 520
+    map_y: 430
+    inventories:
+      grain: {quantity: 140, target: 100, production: 10, consumption: 5}
+      timber: {quantity: 140, target: 100, production: 10, consumption: 5}
+      sugar: {quantity: 60, target: 100, production: 0, consumption: 10}
+      rum: {quantity: 60, target: 100, production: 0, consumption: 8}
+      cloth: {quantity: 60, target: 100, production: 0, consumption: 10}
+      salt: {quantity: 160, target: 100, production: 25, consumption: 5}
+      coffee: {quantity: 60, target: 100, production: 0, consumption: 10}
+      medicine: {quantity: 100, target: 100, production: 5, consumption: 5}
+  - id: isla_esmeralda
+    name: Isla Esmeralda
+    enforcement_bp: 6000
+    map_x: 570
+    map_y: 585
+    inventories:
+      grain: {quantity: 60, target: 100, production: 0, consumption: 10}
+      timber: {quantity: 60, target: 100, production: 0, consumption: 10}
+      sugar: {quantity: 140, target: 100, production: 10, consumption: 5}
+      rum: {quantity: 140, target: 100, production: 10, consumption: 5}
+      cloth: {quantity: 140, target: 100, production: 10, consumption: 5}
+      salt: {quantity: 60, target: 100, production: 0, consumption: 10}
+      coffee: {quantity: 160, target: 100, production: 30, consumption: 5}
+      medicine: {quantity: 140, target: 100, production: 20, consumption: 5}

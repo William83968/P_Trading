@@ -1,4 +1,5 @@
 import os
+import random
 from dataclasses import replace
 from pathlib import Path
 
@@ -8,6 +9,7 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 
 from pirate_trading.models import Commodity, DomainEvent, Inventory, MarketSample, WorldState
+from pirate_trading.narrative import create_event_opportunity
 from pirate_trading.settings import SETTINGS
 from pirate_trading.simulation import SimulationEngine, load_world
 from pirate_trading.ui import (
@@ -15,9 +17,11 @@ from pirate_trading.ui import (
     TimeController,
     build_cargo_holdings,
     build_news_items,
+    game_clock_label,
     market_status,
     price_trend,
 )
+from pirate_trading.ui.layout import message_paper_content_rect
 
 
 def test_importing_ui_does_not_initialize_pygame() -> None:
@@ -33,6 +37,125 @@ def test_time_controller_schedules_fixed_ticks() -> None:
     assert controller.due_ticks(0.5, 64) == 2
     controller.faster()
     assert controller.due_ticks(0.5, 64) == 4
+
+
+def test_game_clock_label_restores_intraday_time() -> None:
+    assert game_clock_label(0, 24) == "Day 1, 00:00"
+    assert game_clock_label(7, 24) == "Day 1, 07:00"
+    assert game_clock_label(23, 24) == "Day 1, 23:00"
+    assert game_clock_label(24, 24) == "Day 2, 00:00"
+
+
+def test_message_paper_layout_scales_from_the_rendered_paper() -> None:
+    original = message_paper_content_rect(pygame.Rect(100, 50, 500, 500))
+    enlarged = message_paper_content_rect(pygame.Rect(280, 65, 880, 680))
+
+    assert original == pygame.Rect(190, 145, 320, 250)
+    assert enlarged == pygame.Rect(438, 194, 564, 340)
+
+
+def test_title_and_overlay_controls_share_the_paper_center(tmp_path: Path) -> None:
+    settings = replace(SETTINGS, quick_save_path=tmp_path / "save.json")
+    app = PirateTradingUI(settings, enable_audio=False)
+    try:
+        app.draw()
+        assert all(
+            app.buttons[name].rect.centerx == app.screen.get_rect().centerx
+            for name in ("new", "continue", "credits", "quit")
+        )
+
+        app.new_game()
+        app.weekly_reveal_elapsed = settings.weekly_reveal_seconds
+        app.draw()
+        paper = pygame.Rect(0, 0, 880, 680)
+        paper.center = app.screen.get_rect().center
+        content = message_paper_content_rect(paper)
+        assert content.contains(app.buttons["continue_week"].rect)
+    finally:
+        app.shutdown()
+
+
+def test_news_pauses_time_and_restores_the_previous_running_state(tmp_path: Path) -> None:
+    settings = replace(SETTINGS, quick_save_path=tmp_path / "save.json")
+    app = PirateTradingUI(settings, enable_audio=False)
+    try:
+        app.new_game()
+        app._dismiss_weekly_reveal()
+        app.time.paused = False
+
+        app._handle_game_action("news")
+        assert app.overlay == "news"
+        assert app.time.paused
+        app.draw()
+        app._handle_click(app.buttons["close_overlay"].rect.center)
+
+        assert app.overlay is None
+        assert not app.time.paused
+    finally:
+        app.shutdown()
+
+
+def test_news_opened_from_notice_resumes_only_after_news_closes(tmp_path: Path) -> None:
+    settings = replace(SETTINGS, quick_save_path=tmp_path / "save.json")
+    app = PirateTradingUI(settings, enable_audio=False)
+    try:
+        app.new_game()
+        app._dismiss_weekly_reveal()
+        app.time.paused = False
+        app._queue_major_event(
+            {
+                "report_id": "relief_notice",
+                "headline": "Relief Call",
+                "information_kind": "FACT",
+            }
+        )
+        app.draw()
+
+        app._handle_click(app.buttons["major_news"].rect.center)
+        assert app.overlay == "news"
+        assert app.time.paused
+        app.draw()
+        app._handle_click(app.buttons["close_overlay"].rect.center)
+
+        assert app.overlay is None
+        assert not app.time.paused
+    finally:
+        app.shutdown()
+
+
+def test_accepting_mission_opens_progress_notice_and_leaves_time_paused(
+    tmp_path: Path,
+) -> None:
+    settings = replace(SETTINGS, quick_save_path=tmp_path / "save.json")
+    app = PirateTradingUI(settings, enable_audio=False)
+    try:
+        app.new_game()
+        app._dismiss_weekly_reveal()
+        app.time.paused = False
+        opportunity = create_event_opportunity(
+            app.world,
+            "mission_notice",
+            "relief_call",
+            app.player.port_id,
+            "medicine",
+            settings,
+            lambda *_: None,
+        )
+        app.selected_opportunity_id = opportunity.id
+
+        app._handle_game_action("opportunities")
+        assert app.time.paused
+        app.draw()
+        app._handle_click(app.buttons[f"opportunity:{opportunity.id}:accept"].rect.center)
+
+        assert app.overlay == "mission_notice"
+        assert "Acquire 10 clean Medicine" in app.mission_notice["body"]
+        app.draw()
+        app._handle_click(app.buttons["continue_mission_notice"].rect.center)
+        assert app.overlay is None
+        assert app.time.paused
+    finally:
+        app.shutdown()
 
 
 def test_market_status_and_trend_are_data_driven() -> None:
@@ -53,6 +176,37 @@ def test_ui_assets_load_and_quit_event_exits_cleanly(tmp_path: Path) -> None:
     assert app.run(maximum_frames=2) == 0
 
 
+def test_unsuitable_background_music_is_disabled_by_default(tmp_path: Path) -> None:
+    settings = replace(SETTINGS, quick_save_path=tmp_path / "save.json")
+    app = PirateTradingUI(settings)
+    try:
+        assert settings.background_music is None
+        assert not app.audio_available
+        assert not pygame.mixer.music.get_busy()
+    finally:
+        app.shutdown()
+
+
+def test_successful_player_raid_opens_persistent_loot_overlay(tmp_path: Path) -> None:
+    settings = replace(SETTINGS, quick_save_path=tmp_path / "save.json")
+    app = PirateTradingUI(settings, enable_audio=False)
+    try:
+        app.new_game()
+        app._dismiss_weekly_reveal()
+        app.engine.random_service._streams["player_raids"] = random.Random(1)
+
+        app._execute_player_raid(port=True)
+        app.draw()
+
+        assert app.overlay == "raid_loot"
+        assert app.time.paused
+        assert "raid_loot_claim" in app.buttons
+        assert "raid_loot_leave" in app.buttons
+        assert app.player.cargo.get("medicine", 0) == 0
+    finally:
+        app.shutdown()
+
+
 def test_ui_trade_button_uses_immediate_player_command(tmp_path: Path) -> None:
     settings = replace(SETTINGS, quick_save_path=tmp_path / "save.json")
     app = PirateTradingUI(settings, enable_audio=False)
@@ -70,11 +224,53 @@ def test_ui_trade_button_uses_immediate_player_command(tmp_path: Path) -> None:
         app.shutdown()
 
 
+def test_new_player_starts_with_an_empty_hold(tmp_path: Path) -> None:
+    settings = replace(SETTINGS, quick_save_path=tmp_path / "save.json")
+    app = PirateTradingUI(settings, enable_audio=False)
+    try:
+        app.new_game()
+
+        assert app.player.cargo_quantity == 0
+        assert app.player.ship.provisions == 0
+    finally:
+        app.shutdown()
+
+
+def test_opportunity_list_and_description_scroll_independently(tmp_path: Path) -> None:
+    settings = replace(SETTINGS, quick_save_path=tmp_path / "save.json")
+    app = PirateTradingUI(settings, enable_audio=False)
+    try:
+        app.new_game()
+        app._dismiss_weekly_reveal()
+        opportunity = create_event_opportunity(
+            app.world,
+            "scroll_test",
+            "relief_call",
+            app.player.port_id,
+            "medicine",
+            settings,
+            lambda *_: None,
+        )
+        opportunity.description = " ".join(["Detailed emergency instructions."] * 100)
+        app._handle_game_action("opportunities")
+        app.draw()
+
+        assert app.opportunity_detail_max_scroll > 0
+        list_scroll = app.overlay_scroll
+        app._handle_scroll(-1, app.opportunity_detail_rect.center)
+
+        assert app.opportunity_detail_scroll == 1
+        assert app.overlay_scroll == list_scroll
+    finally:
+        app.shutdown()
+
+
 def test_arrival_automatically_pauses_and_selects_destination(tmp_path: Path) -> None:
     settings = replace(SETTINGS, quick_save_path=tmp_path / "save.json")
     app = PirateTradingUI(settings, enable_audio=False)
     try:
         app.new_game()
+        app._dismiss_weekly_reveal()
         destination = "blackwater_cay"
         app.selected_port_id = destination
         app._execute_sail()
@@ -145,6 +341,7 @@ def test_market_and_hold_sell_through_identical_command_path(tmp_path: Path) -> 
     app = PirateTradingUI(settings, enable_audio=False)
     try:
         app.new_game()
+        app._dismiss_weekly_reveal()
         app.selected_commodity_id = "grain"
         app.trade_quantity = 2
         app._execute_trade(True)
@@ -201,6 +398,7 @@ def test_long_market_and_hold_lists_scroll_without_assets(tmp_path: Path) -> Non
     app = PirateTradingUI(settings, enable_audio=False)
     try:
         app.new_game()
+        app._dismiss_weekly_reveal()
         for index in range(7):
             commodity_id = f"test_{index}"
             app.world.commodities[commodity_id] = Commodity(
@@ -219,13 +417,14 @@ def test_long_market_and_hold_lists_scroll_without_assets(tmp_path: Path) -> Non
                 app.world.price_history[port.id][commodity_id] = [MarketSample(0, 100, 475, 525)]
 
         app.active_sidebar_tab = "market"
-        app._handle_scroll(-20, (1100, 300))
+        inspector_point = app.layout.inspector.center
+        app._handle_scroll(-20, inspector_point)
         app.draw()
         assert app.row_offsets["market"] > 0
         assert "commodity:test_6" in app.buttons
 
         app.active_sidebar_tab = "hold"
-        app._handle_scroll(-20, (1100, 300))
+        app._handle_scroll(-20, inspector_point)
         app.draw()
         assert app.row_offsets["hold"] > 0
         assert "holding:test_6" in app.buttons
@@ -334,7 +533,7 @@ def test_load_resets_transient_ui_without_changing_saved_world(tmp_path: Path) -
 
         assert app.world.state_hash() == expected_hash
         assert app.active_sidebar_tab == "market"
-        assert app.overlay is None
+        assert app.overlay == "weekly_roll"
         assert app.row_offsets == {"market": 0, "hold": 0}
         assert app.news_read_through_sequence == max(
             event.sequence for event in app.world.recent_events

@@ -6,6 +6,10 @@ from typing import Any
 
 from pirate_trading.models import Merchant, WorldState
 from pirate_trading.settings import SimulationSettings
+from pirate_trading.world_events import (
+    active_event_multiplier,
+    current_outlook_rule,
+)
 
 EventEmitter = Callable[[str, dict[str, Any]], None]
 DirtyPrices = dict[tuple[str, str], set[str]]
@@ -32,18 +36,21 @@ def calculate_quote(
     quantity: int,
     target: int,
     scale: int,
+    spread_multiplier_bp: int = 10_000,
 ) -> tuple[int, int]:
     """Calculate the bid and ask using deterministic basis-point arithmetic."""
     pressure_bp = ((target - quantity) * scale) // target
     adjustment_bp = (elasticity_bp * pressure_bp) // scale
     reference = (base_price * (scale + adjustment_bp)) // scale
     reference = min(max(reference, minimum_price), maximum_price)
-    bid = (reference * (scale - spread_bp)) // scale
-    ask = (reference * (scale + spread_bp) + scale - 1) // scale
+    effective_spread = spread_bp * spread_multiplier_bp // scale
+    bid = (reference * (scale - effective_spread)) // scale
+    ask = (reference * (scale + effective_spread) + scale - 1) // scale
     return bid, ask
 
 
 def initialize_prices(world: WorldState, settings: SimulationSettings) -> None:
+    spread_multiplier = current_outlook_rule(world).spread_bp
     for port in world.ports.values():
         for commodity_id, inventory in port.inventories.items():
             commodity = world.commodities[commodity_id]
@@ -56,6 +63,7 @@ def initialize_prices(world: WorldState, settings: SimulationSettings) -> None:
                 inventory.quantity,
                 inventory.target,
                 settings.basis_point_scale,
+                spread_multiplier,
             )
 
 
@@ -65,6 +73,7 @@ def recalculate_prices(
     dirty: DirtyPrices,
     emit: EventEmitter,
 ) -> None:
+    spread_multiplier = current_outlook_rule(world).spread_bp
     for (port_id, commodity_id), causes in sorted(dirty.items()):
         inventory = world.ports[port_id].inventories[commodity_id]
         old_bid, old_ask = inventory.bid_price, inventory.ask_price
@@ -78,6 +87,7 @@ def recalculate_prices(
             inventory.quantity,
             inventory.target,
             settings.basis_point_scale,
+            spread_multiplier,
         )
         if (old_bid, old_ask) != (inventory.bid_price, inventory.ask_price):
             emit(
@@ -101,15 +111,21 @@ def apply_daily_economy(world: WorldState, dirty: DirtyPrices, emit: EventEmitte
         port = world.ports[port_id]
         for commodity_id in sorted(port.inventories):
             inventory = port.inventories[commodity_id]
-            produced = inventory.daily_production
+            production_bp = active_event_multiplier(world, port_id, commodity_id, "production")
+            consumption_bp = active_event_multiplier(world, port_id, commodity_id, "consumption")
+            produced = inventory.daily_production * production_bp // 10_000
             inventory.quantity += produced
             world.ledger.produced[commodity_id] += produced
 
-            consumed = min(inventory.quantity, inventory.daily_consumption)
-            unmet = inventory.daily_consumption - consumed
+            demand = inventory.daily_consumption * consumption_bp // 10_000
+            consumed = min(inventory.quantity, demand)
+            unmet = demand - consumed
             inventory.quantity -= consumed
             world.ledger.consumed[commodity_id] += consumed
             world.ledger.unmet_demand[commodity_id] += unmet
+            household_spending = consumed * world.commodities[commodity_id].base_price
+            port.treasury += household_spending
+            world.ledger.local_consumption_revenue += household_spending
 
             overflow = max(0, inventory.quantity - inventory.capacity)
             inventory.quantity -= overflow
@@ -137,6 +153,7 @@ def buy_cargo(
     commodity_id: str,
     quantity: int,
     dirty: DirtyPrices,
+    unit_price: int | None = None,
 ) -> str | None:
     merchant = world.merchants.get(merchant_id)
     port = world.ports.get(port_id)
@@ -151,7 +168,7 @@ def buy_cargo(
         return "port has insufficient inventory"
     if merchant.cargo_quantity + quantity > merchant.capacity:
         return "merchant cargo capacity would be exceeded"
-    cost = inventory.ask_price * quantity
+    cost = (unit_price if unit_price is not None else inventory.ask_price) * quantity
     if merchant.cash < cost:
         return "merchant has insufficient cash"
 
@@ -171,6 +188,7 @@ def sell_cargo(
     commodity_id: str,
     quantity: int,
     dirty: DirtyPrices,
+    unit_price: int | None = None,
 ) -> tuple[str | None, int]:
     merchant = world.merchants.get(merchant_id)
     port = world.ports.get(port_id)
@@ -183,15 +201,20 @@ def sell_cargo(
     held = merchant.cargo.get(commodity_id, 0)
     if held < quantity:
         return "merchant has insufficient cargo", 0
+    clean_quantity = held - merchant.stolen_cargo.get(commodity_id, 0)
+    if quantity > clean_quantity:
+        return "lawful buyers refuse stolen cargo; fence it at Blackwater Cay", 0
     inventory = port.inventories[commodity_id]
     if inventory.quantity + quantity > inventory.capacity:
         return "port storage capacity would be exceeded", 0
-    proceeds = inventory.bid_price * quantity
+    proceeds = (unit_price if unit_price is not None else inventory.bid_price) * quantity
     if port.treasury < proceeds:
         return "port treasury has insufficient cash", 0
 
     total_basis = merchant.cargo_cost_basis.get(commodity_id, 0)
-    sold_basis = total_basis if quantity == held else (total_basis * quantity) // held
+    sold_basis = (
+        total_basis if quantity == clean_quantity else (total_basis * quantity) // clean_quantity
+    )
     inventory.quantity += quantity
     port.treasury -= proceeds
     merchant.cash += proceeds
@@ -227,9 +250,16 @@ def best_merchant_opportunity(
             origin_inventory = origin.inventories[commodity_id]
             destination_inventory = destination.inventories[commodity_id]
             ask = origin_inventory.ask_price
-            bid = destination_inventory.bid_price
+            report = (
+                world.port_market_reports.get(merchant.port_id, {})
+                .get(destination_id, {})
+                .get(commodity_id)
+            )
+            if world.port_market_reports and report is None:
+                continue
+            bid = report.bid_price if report is not None else destination_inventory.bid_price
             quantity = min(
-                merchant.capacity,
+                merchant.capacity - merchant.cargo_quantity,
                 origin_inventory.quantity,
                 available_cash // ask,
                 destination.treasury // bid if bid else 0,

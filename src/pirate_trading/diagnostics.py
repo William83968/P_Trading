@@ -49,7 +49,7 @@ def _money(cents: int) -> str:
 def format_report(report: SimulationReport, world: WorldState) -> str:
     """Format the final world and economic ledger for terminal output."""
     lines = [
-        "Pirate Trading — Milestone 0",
+        "Pirate Trading — Milestone 2 Living World",
         f"Seed: {report.seed}",
         f"Completed ticks: {report.completed_ticks:,}",
         f"State hash: {report.state_hash}",
@@ -77,6 +77,46 @@ def format_report(report: SimulationReport, world: WorldState) -> str:
             f"unmet {world.ledger.unmet_demand[commodity_id]:,}"
         )
     lines.append(f"  Operating-cost sink: {_money(world.ledger.operating_costs)}")
+    lines.append(f"  Wages paid: {_money(world.ledger.wages_paid)}")
+    lines.append(
+        f"  Local-consumption cash source: {_money(world.ledger.local_consumption_revenue)}"
+    )
+    lines.append(f"  Player-raid expense sink: {_money(world.ledger.raid_expenses)}")
+    lines.append(f"  Navy fines: {_money(world.ledger.fines_paid)}")
+    lines.append(f"  Provisions consumed: {world.ledger.provisions_consumed:,}")
+    lines.append(
+        f"  Event losses: {sum(world.ledger.event_losses.values()):,} units; "
+        f"piracy losses: {sum(world.ledger.piracy_losses.values()):,} units; "
+        f"confiscated: {sum(world.ledger.confiscated_goods.values()):,} units; "
+        f"salvaged: {sum(world.ledger.salvage_recovered.values()):,} units"
+    )
+    lines.extend(
+        [
+            "",
+            "Piracy pressure",
+            f"  Notoriety: {world.piracy_state.notoriety}",
+            "  Local heat: "
+            + ", ".join(
+                f"{world.ports[port_id].name} {heat}"
+                for port_id, heat in sorted(world.piracy_state.local_heat.items())
+            ),
+        ]
+    )
+
+    if world.weekly_outlook is not None:
+        lines.extend(
+            [
+                "",
+                "Weekly outlook",
+                f"  Week {world.weekly_outlook.week_index + 1}: "
+                f"{world.weekly_outlook.setting_id.replace('_', ' ').title()} "
+                f"({world.weekly_outlook.die_one}+{world.weekly_outlook.die_two}="
+                f"{world.weekly_outlook.total})",
+                f"  Active conditions: {len(world.active_conditions)}; "
+                f"open opportunities: "
+                f"{sum(item.status == 'offered' for item in world.opportunities.values())}",
+            ]
+        )
 
     lines.extend(["", "Merchants"])
     for merchant_id in sorted(world.merchants):
@@ -86,6 +126,11 @@ def format_report(report: SimulationReport, world: WorldState) -> str:
             f"  {merchant.name}: cash {_money(merchant.cash)}, profit "
             f"{_money(merchant.realized_profit)}, trades {merchant.completed_trades}, "
             f"voyages {merchant.completed_voyages}, location {location}"
+        )
+        lines.append(
+            f"    Ship: condition {merchant.ship.condition}, provisions "
+            f"{merchant.ship.provisions}, wage debt {_money(merchant.ship.wage_debt)}, "
+            f"upgrades {', '.join(merchant.ship.upgrades) or 'none'}"
         )
 
     lines.extend(

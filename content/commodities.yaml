@@ -4,33 +4,54 @@ commodities:
     base_price: 100
     minimum_price: 50
     maximum_price: 250
-    elasticity_bp: 7500
+    elasticity_bp: 12000
     spread_bp: 500
   - id: timber
     name: Timber
     base_price: 250
     minimum_price: 125
     maximum_price: 625
-    elasticity_bp: 7500
+    elasticity_bp: 13000
     spread_bp: 500
   - id: sugar
     name: Sugar
     base_price: 400
     minimum_price: 200
     maximum_price: 1000
-    elasticity_bp: 7500
+    elasticity_bp: 14000
     spread_bp: 500
   - id: rum
     name: Rum
     base_price: 650
     minimum_price: 325
     maximum_price: 1625
-    elasticity_bp: 7500
+    elasticity_bp: 15000
     spread_bp: 500
   - id: cloth
     name: Cloth
     base_price: 900
     minimum_price: 450
     maximum_price: 2250
-    elasticity_bp: 7500
+    elasticity_bp: 13000
+    spread_bp: 500
+  - id: salt
+    name: Salt
+    base_price: 150
+    minimum_price: 75
+    maximum_price: 375
+    elasticity_bp: 9000
+    spread_bp: 500
+  - id: coffee
+    name: Coffee
+    base_price: 550
+    minimum_price: 275
+    maximum_price: 1375
+    elasticity_bp: 14000
+    spread_bp: 500
+  - id: medicine
+    name: Medicine
+    base_price: 1200
+    minimum_price: 600
+    maximum_price: 3000
+    elasticity_bp: 15000
     spread_bp: 500

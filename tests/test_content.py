@@ -11,9 +11,24 @@ from pirate_trading.settings import SETTINGS
 def test_loads_configured_world_content() -> None:
     content = load_content(SETTINGS)
 
-    assert set(content.commodities) == {"grain", "timber", "sugar", "rum", "cloth"}
-    assert set(content.ports) == {"crowns_haven", "san_cordelia", "blackwater_cay"}
-    assert len(content.routes) == 3
+    assert set(content.commodities) == {
+        "grain",
+        "timber",
+        "sugar",
+        "rum",
+        "cloth",
+        "salt",
+        "coffee",
+        "medicine",
+    }
+    assert set(content.ports) == {
+        "crowns_haven",
+        "san_cordelia",
+        "blackwater_cay",
+        "whitecap_reach",
+        "isla_esmeralda",
+    }
+    assert len(content.routes) == 7
     assert (content.ports["crowns_haven"].map_x, content.ports["crowns_haven"].map_y) == (
         245,
         375,
@@ -23,6 +38,7 @@ def test_loads_configured_world_content() -> None:
         for port in content.ports.values()
         for inventory in port.inventories.values()
     )
+    assert content.routes["whitecap_reach_isla_esmeralda"].risk_bp == 500
 
 
 def test_malformed_yaml_has_source_aware_error(tmp_path: Path) -> None:

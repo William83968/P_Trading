@@ -4,13 +4,47 @@ routes:
     port_b: san_cordelia
     travel_ticks: 36
     operating_cost: 150
+    risk_bp: 400
+    navy_patrol_bp: 600
   - id: san_cordelia_blackwater_cay
     port_a: san_cordelia
     port_b: blackwater_cay
     travel_ticks: 24
     operating_cost: 100
+    risk_bp: 700
+    navy_patrol_bp: 250
   - id: blackwater_cay_crowns_haven
     port_a: blackwater_cay
     port_b: crowns_haven
     travel_ticks: 30
     operating_cost: 125
+    risk_bp: 800
+    navy_patrol_bp: 350
+  - id: crowns_haven_whitecap_reach
+    port_a: crowns_haven
+    port_b: whitecap_reach
+    travel_ticks: 28
+    operating_cost: 130
+    risk_bp: 300
+    navy_patrol_bp: 500
+  - id: whitecap_reach_isla_esmeralda
+    port_a: whitecap_reach
+    port_b: isla_esmeralda
+    travel_ticks: 26
+    operating_cost: 120
+    risk_bp: 500
+    navy_patrol_bp: 350
+  - id: isla_esmeralda_san_cordelia
+    port_a: isla_esmeralda
+    port_b: san_cordelia
+    travel_ticks: 24
+    operating_cost: 110
+    risk_bp: 400
+    navy_patrol_bp: 450
+  - id: isla_esmeralda_blackwater_cay
+    port_a: isla_esmeralda
+    port_b: blackwater_cay
+    travel_ticks: 32
+    operating_cost: 150
+    risk_bp: 900
+    navy_patrol_bp: 150

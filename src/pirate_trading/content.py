@@ -143,7 +143,10 @@ def _load_ports(
             map_x=_integer(record, "map_x", context),
             map_y=_integer(record, "map_y", context),
             inventories=inventories,
+            enforcement_bp=_integer(record, "enforcement_bp", context),
         )
+        if ports[port_id].enforcement_bp > settings.basis_point_scale:
+            raise ContentError(f"{context}: enforcement_bp cannot exceed 10000")
         if ports[port_id].map_x > settings.map_width or ports[port_id].map_y > settings.map_height:
             raise ContentError(f"{context}: map coordinates fall outside the configured map")
     if not ports:
@@ -170,7 +173,11 @@ def _load_routes(path: Path, ports: dict[str, Port]) -> dict[str, Route]:
             port_b=port_b,
             travel_ticks=_integer(record, "travel_ticks", context, positive=True),
             operating_cost=_integer(record, "operating_cost", context),
+            risk_bp=_integer(record, "risk_bp", context),
+            navy_patrol_bp=_integer(record, "navy_patrol_bp", context),
         )
+        if routes[route_id].navy_patrol_bp > 10_000:
+            raise ContentError(f"{context}: navy_patrol_bp cannot exceed 10000")
     if not routes:
         raise ContentError(f"{path}: at least one route is required")
     connected_ports = {

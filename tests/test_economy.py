@@ -43,8 +43,8 @@ def test_daily_economy_records_production_consumption_and_overflow() -> None:
     )
 
     assert inventory.quantity == inventory.capacity
-    assert world.ledger.produced["grain"] == 25
-    assert world.ledger.consumed["grain"] == 20
+    assert world.ledger.produced["grain"] == 35
+    assert world.ledger.consumed["grain"] == 35
     assert world.ledger.overflow["grain"] == 15
     assert events
 
@@ -68,6 +68,8 @@ def test_buy_and_sell_are_atomic_and_conserve_cash_and_goods() -> None:
 def test_merchant_finds_a_profitable_executable_trade() -> None:
     world = load_world()
     merchant = world.merchants["merchant_1"]
+    for source_id, commodities in world.port_market_reports.items():
+        world.port_market_reports[merchant.port_id][source_id] = commodities[source_id]
 
     opportunity = best_merchant_opportunity(world, merchant, SETTINGS)
 

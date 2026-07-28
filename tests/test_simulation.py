@@ -3,7 +3,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from pirate_trading.diagnostics import JsonlEventWriter, format_report
-from pirate_trading.models import BeginVoyage, BuyCargo
+from pirate_trading.models import BeginVoyage, BuyCargo, BuyProvisions
 from pirate_trading.settings import SETTINGS
 from pirate_trading.simulation import SimulationEngine, load_world
 
@@ -33,7 +33,12 @@ def test_player_empty_voyage_takes_exact_route_duration() -> None:
     destination = route.other_end(merchant.port_id)
     engine = SimulationEngine(world, settings)
 
-    events = engine.execute_commands([BeginVoyage(merchant.id, route.id, destination)])
+    events = engine.execute_commands(
+        [
+            BuyProvisions(merchant.id, merchant.port_id, 2),
+            BeginVoyage(merchant.id, route.id, destination),
+        ]
+    )
     assert any(event.event_type == "ShipDeparted" for event in events)
     assert world.tick == 0
     assert merchant.voyage.remaining_ticks == route.travel_ticks
